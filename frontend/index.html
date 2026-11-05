@@ -1,0 +1,937 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Website Q&amp;A</title>
+<style>
+  :root {
+    --bg: #f7f7f8; --panel: #ffffff; --text: #1a1a1a; --muted: #6b6b6b;
+    --border: #e3e3e6; --accent: #c2410c; --accent-text: #ffffff;
+    --user: #fff1e8; --ok: #15803d; --miss: #b91c1c; --err-bg: #fef2f2;
+    --stage: #ececef; --warn: #b45309;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141415; --panel: #1e1e20; --text: #ececec; --muted: #9a9a9a;
+      --border: #333336; --accent: #f97316; --accent-text: #141415;
+      --user: #2a1f18; --ok: #4ade80; --miss: #f87171; --err-bg: #2a1616;
+      --stage: #0c0c0d; --warn: #fbbf24;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.55 system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); }
+  .wrap { max-width: 820px; margin: 0 auto; padding: 24px 16px; min-height: 100vh; display: flex; flex-direction: column; }
+  .wrap.wide { max-width: 1240px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  h3 { font-size: 14px; margin: 0 0 10px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  button { font: inherit; cursor: pointer; border-radius: 8px; border: 1px solid var(--border); background: var(--panel); color: var(--text); padding: 8px 14px; }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
+  button.small { padding: 4px 10px; font-size: 13px; }
+  button:disabled { opacity: .55; cursor: default; }
+  input, textarea, select { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; width: 100%; }
+  .row { display: flex; gap: 8px; }
+  .hidden { display: none !important; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+  .status { color: var(--muted); margin-top: 12px; }
+  .error { background: var(--err-bg); color: var(--miss); border-radius: 8px; padding: 10px 12px; margin-top: 12px; }
+  .topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+  .badges { display: flex; gap: 6px; flex-wrap: wrap; }
+  .badge { font-size: 13px; border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; background: var(--panel); text-decoration: none; color: var(--text); }
+  .badge.ok::before { content: "✓ "; color: var(--ok); }
+  .badge.miss { color: var(--muted); }
+  .badge.miss::before { content: "✗ "; color: var(--miss); }
+  #messages { flex: 1; display: flex; flex-direction: column; gap: 12px; padding: 4px 0 16px; }
+  .msg { max-width: 92%; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--panel); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .msg.user { align-self: flex-end; background: var(--user); }
+  .msg.thinking { color: var(--muted); font-style: italic; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { font-size: 13px; padding: 5px 10px; border-radius: 999px; }
+  .composer { position: sticky; bottom: 0; background: var(--bg); padding: 12px 0 4px; }
+  .composer textarea { resize: none; height: 46px; }
+  .host { font-weight: 600; overflow-wrap: anywhere; }
+
+  /* tabs */
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+  .tab { border: none; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 8px 14px; color: var(--muted); }
+  .tab.active { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+  .tab-panel { display: flex; flex-direction: column; flex: 1; }
+
+  /* Component Lab */
+  .drop { border: 2px dashed var(--border); border-radius: 12px; padding: 28px 16px; text-align: center; cursor: pointer; color: var(--muted); }
+  .drop.over { border-color: var(--accent); color: var(--text); }
+  .drop img { max-width: 100%; max-height: 320px; border-radius: 8px; display: block; margin: 0 auto 10px; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .pair figure { margin: 0; }
+  .pair figcaption { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .pair img { width: 100%; max-height: 360px; object-fit: contain; background: var(--stage); border-radius: 8px; border: 1px solid var(--border); }
+  .pill { display: inline-block; font-size: 12px; border-radius: 999px; padding: 2px 9px; border: 1px solid var(--border); margin-right: 6px; }
+  .pill.high, .pill.good { color: var(--ok); border-color: currentColor; }
+  .pill.medium, .pill.manual, .pill.fair { color: var(--warn); border-color: currentColor; }
+  .pill.low, .pill.poor { color: var(--miss); border-color: currentColor; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+  .pick-area { position: relative; user-select: none; cursor: crosshair; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; max-height: 70vh; overflow-y: auto; }
+  .pick-area img { display: block; width: 100%; pointer-events: none; }
+  .pick-box { position: absolute; border: 2px solid var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent); pointer-events: none; }
+  .steps { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+  .steps li { display: flex; gap: 10px; align-items: center; color: var(--muted); }
+  .steps li.active { color: var(--text); }
+  .steps li .dot { width: 18px; text-align: center; }
+  .steps li.active .dot::before { content: ""; display: inline-block; width: 12px; height: 12px; border: 2px solid var(--accent); border-right-color: transparent; border-radius: 50%; animation: spin .8s linear infinite; }
+  .steps li.done .dot::before { content: "✓"; color: var(--ok); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .steps li.active .dot::before { animation: none; } }
+
+  .lab-head { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: baseline; margin-bottom: 12px; }
+  .lab-head h2 { font-size: 18px; margin: 0; }
+  .lab-grid { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 16px; align-items: start; }
+  .side { display: flex; flex-direction: column; gap: 12px; }
+  .side .card { padding: 16px; }
+  .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+  .toolbar select { width: auto; padding: 4px 8px; font-size: 13px; }
+  .toolbar input[type=range] { flex: 1; min-width: 120px; padding: 0; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .seg button { border: none; border-radius: 0; padding: 4px 10px; font-size: 13px; }
+  .seg button.on { background: var(--accent); color: var(--accent-text); }
+  .stage { background: var(--stage); border: 1px solid var(--border); border-radius: 12px; padding: 12px; overflow-x: auto; }
+  .stage iframe { display: block; border: 0; width: 100%; height: 420px; margin: 0 auto; background: transparent; border-radius: 6px; }
+  .frames { display: flex; gap: 8px; overflow-x: auto; padding-top: 8px; }
+  .frames figure { margin: 0; flex: 0 0 auto; }
+  .frames img { height: 120px; border-radius: 6px; border: 1px solid var(--border); display: block; }
+  .frames figcaption { font-size: 12px; color: var(--muted); }
+  details { margin-top: 12px; }
+  summary { cursor: pointer; color: var(--muted); font-size: 14px; }
+  .notes { white-space: pre-wrap; font-size: 14px; margin: 8px 0 0; }
+  .param { margin-bottom: 12px; }
+  .param label { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 4px; }
+  .param label span { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .param input[type=range] { padding: 0; }
+  .param input[type=color] { height: 34px; padding: 2px; }
+  .param select { padding: 6px 8px; font-size: 14px; }
+  .edit-log { display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; margin-bottom: 8px; font-size: 14px; }
+  .edit-log .me { align-self: flex-end; background: var(--user); border-radius: 10px; padding: 6px 10px; }
+  .edit-log .ai { color: var(--muted); }
+  .edit-log .err { color: var(--miss); }
+  .side textarea { resize: vertical; min-height: 64px; font-size: 14px; }
+  .muted { color: var(--muted); font-size: 13px; }
+  @media (max-width: 900px) {
+    .lab-grid { grid-template-columns: 1fr; }
+    .pair { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap" id="wrap">
+
+  <!-- Screen 1: URL input -->
+  <section id="screen-url">
+    <h1>Website Q&amp;A</h1>
+    <p class="sub">Paste a product website. We read its homepage, pricing and about pages, summarize them, and answer your questions from that content only.</p>
+    <div class="card">
+      <form id="url-form" class="row">
+        <input id="url-input" type="text" placeholder="https://example.com" autocomplete="off" required>
+        <button id="url-btn" class="primary" type="submit">Read website</button>
+      </form>
+      <div id="url-status" class="status hidden"></div>
+      <div id="url-error" class="error hidden"></div>
+    </div>
+  </section>
+
+  <!-- Screen 2: chat + Component Lab -->
+  <section id="screen-chat" class="hidden" style="display:flex;flex-direction:column;flex:1">
+    <div class="topbar">
+      <div>
+        <div class="host" id="site-host"></div>
+        <div class="badges" id="badges"></div>
+      </div>
+      <button id="reset-btn" type="button">New website</button>
+    </div>
+    <div class="tabs" role="tablist">
+      <button class="tab active" id="tab-chat-btn" type="button" role="tab" data-tab="chat">Chat</button>
+      <button class="tab" id="tab-lab-btn" type="button" role="tab" data-tab="lab">Component Lab</button>
+    </div>
+
+    <div class="tab-panel" id="tab-chat">
+      <div id="messages"></div>
+      <div class="composer">
+        <form id="chat-form" class="row">
+          <textarea id="chat-input" placeholder="Ask about this website…" required></textarea>
+          <button id="chat-btn" class="primary" type="submit">Send</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="tab-panel hidden" id="tab-lab">
+
+      <!-- Lab step 1: screenshot -->
+      <div id="lab-upload" class="card">
+        <p style="margin-top:0">Saw an animation or visual you like on <strong class="lab-host"></strong>? Share a screenshot of it. We'll find it on the homepage, rebuild it as a standalone component, and let you play with it.</p>
+        <div id="drop" class="drop" tabindex="0" role="button" aria-label="Choose a screenshot">
+          <img id="drop-img" class="hidden" alt="Your screenshot">
+          <div id="drop-text">Drop a screenshot here, paste it (⌘V / Ctrl+V), or click to choose</div>
+        </div>
+        <input id="file-input" type="file" accept="image/*" class="hidden">
+        <div class="actions">
+          <button id="find-btn" class="primary" type="button" disabled>Find it on the page</button>
+        </div>
+        <div id="upload-status" class="status hidden"></div>
+        <div id="upload-error" class="error hidden"></div>
+      </div>
+
+      <!-- Lab step 2: confirm match / pick manually -->
+      <div id="lab-confirm" class="card hidden">
+        <div id="match-head" style="margin-bottom:12px"></div>
+        <div class="pair">
+          <figure><figcaption>Your screenshot</figcaption><img id="confirm-user" alt="Your screenshot"></figure>
+          <figure><figcaption>What we found on the page</figcaption><img id="confirm-crop" alt="Matched part of the page"></figure>
+        </div>
+        <div class="actions">
+          <button id="build-btn" class="primary" type="button">Yes, rebuild this</button>
+          <button id="pick-btn" type="button">Not quite, let me pick it</button>
+          <button class="lab-restart" type="button">Use another screenshot</button>
+        </div>
+        <div id="confirm-error" class="error hidden"></div>
+      </div>
+
+      <div id="lab-pick" class="card hidden">
+        <p style="margin-top:0">Drag a box around the component on the homepage below.</p>
+        <div id="pick-area" class="pick-area"><div id="pick-box" class="pick-box hidden"></div></div>
+        <div class="actions">
+          <button id="pick-use" class="primary" type="button" disabled>Use this area</button>
+          <button id="pick-cancel" type="button">Back</button>
+        </div>
+        <div id="pick-error" class="error hidden"></div>
+      </div>
+
+      <!-- Lab step 3: progress -->
+      <div id="lab-progress" class="card hidden">
+        <ul id="steps" class="steps"></ul>
+        <p class="muted" style="margin-bottom:0">This usually takes 30–90 seconds.</p>
+        <div id="progress-error" class="error hidden"></div>
+        <div class="actions hidden" id="progress-actions">
+          <button id="retry-build" class="primary" type="button">Try again</button>
+          <button class="lab-restart" type="button">Use another screenshot</button>
+        </div>
+      </div>
+
+      <!-- Lab step 4: playground -->
+      <div id="lab-play" class="hidden">
+        <div class="lab-head">
+          <h2 id="play-title"></h2>
+          <div id="play-meta"></div>
+        </div>
+        <div class="lab-grid">
+          <div>
+            <div class="toolbar">
+              <button id="pp-btn" class="small" type="button">Pause</button>
+              <button id="replay-btn" class="small" type="button">Replay</button>
+              <select id="speed" aria-label="Playback speed">
+                <option value="0.25">0.25×</option><option value="0.5">0.5×</option>
+                <option value="1" selected>1×</option><option value="2">2×</option>
+              </select>
+              <input id="scrub" type="range" min="0" max="1000" value="0" aria-label="Scrub animation">
+              <div class="seg" id="widths">
+                <button type="button" class="on" data-w="fit">Fit</button>
+                <button type="button" data-w="768">Tablet</button>
+                <button type="button" data-w="390">Mobile</button>
+              </div>
+            </div>
+            <div class="stage"><iframe id="frame" sandbox="allow-scripts" title="Component preview"></iframe></div>
+            <div id="frame-error" class="error hidden"></div>
+            <details open>
+              <summary>Original on the site</summary>
+              <div class="frames" id="orig-frames"></div>
+            </details>
+            <details>
+              <summary>About this rebuild</summary>
+              <p class="notes" id="play-notes"></p>
+              <p class="notes muted" id="play-diffs"></p>
+            </details>
+          </div>
+          <aside class="side">
+            <div class="card">
+              <h3>Tweak</h3>
+              <div id="params"></div>
+              <button id="reset-params" class="small" type="button">Reset to defaults</button>
+            </div>
+            <div class="card">
+              <h3>Ask for changes</h3>
+              <div class="edit-log" id="edit-log"></div>
+              <form id="edit-form">
+                <textarea id="edit-input" placeholder="e.g. make it purple and twice as fast"></textarea>
+                <div class="actions" style="margin-top:8px">
+                  <button id="edit-btn" class="primary small" type="submit">Apply</button>
+                  <button id="undo-btn" class="small" type="button" disabled>Undo</button>
+                </div>
+              </form>
+            </div>
+            <div class="card">
+              <h3>Use it</h3>
+              <div class="actions" style="margin-top:0">
+                <button id="copy-btn" class="small" type="button">Copy HTML</button>
+                <button id="download-btn" class="small" type="button">Download .html</button>
+                <button class="lab-restart small" type="button">New component</button>
+              </div>
+              <p class="muted" style="margin-bottom:0">Rebuilt for prototyping. Check the original site's licence before using its images or animation files in production.</p>
+            </div>
+          </aside>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+</div>
+<script>
+  const $ = (id) => document.getElementById(id);
+  let siteId = null;
+  let history = [];   // [{role, content}] sent with every /chat call
+  let busy = false;
+
+  async function post(path, body) {
+    const res = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || `Request failed (${res.status})`);
+    return data;
+  }
+
+  const show = (el, on = true) => (typeof el === "string" ? $(el) : el).classList.toggle("hidden", !on);
+  const setError = (id, msg) => { $(id).textContent = msg || ""; show(id, !!msg); };
+
+  // ---------- Screen 1 ----------
+  $("url-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const url = $("url-input").value.trim();
+    if (!url) return;
+    $("url-btn").disabled = true;
+    $("url-error").classList.add("hidden");
+    $("url-status").classList.remove("hidden");
+    $("url-status").textContent = "Reading homepage, pricing and about pages, then summarizing… (this can take 20–60s)";
+    try {
+      const data = await post("/ingest", { url });
+      siteId = data.site_id;
+      history = [
+        { role: "user", content: data.summary_request },
+        { role: "assistant", content: data.summary },
+      ];
+      showChat(data);
+    } catch (err) {
+      $("url-error").textContent = err.message;
+      $("url-error").classList.remove("hidden");
+    } finally {
+      $("url-btn").disabled = false;
+      $("url-status").classList.add("hidden");
+    }
+  });
+
+  function showChat(data) {
+    $("screen-url").classList.add("hidden");
+    $("screen-chat").classList.remove("hidden");
+    const home = data.pages.homepage;
+    $("site-host").textContent = home.title || new URL(home.url).host;
+    document.querySelectorAll(".lab-host").forEach((el) => (el.textContent = new URL(home.url).host));
+    const badges = $("badges");
+    badges.innerHTML = "";
+    for (const [key, label] of [["homepage", "Homepage"], ["pricing", "Pricing"], ["about", "About"]]) {
+      const page = data.pages[key];
+      const el = document.createElement(page ? "a" : "span");
+      el.className = "badge " + (page ? "ok" : "miss");
+      el.textContent = label + (page && page.truncated ? " (truncated)" : "") + (page ? "" : " not found");
+      if (page) { el.href = page.url; el.target = "_blank"; el.title = page.url; }
+      badges.appendChild(el);
+    }
+    $("messages").innerHTML = "";
+    addMessage("assistant", data.summary, data.suggestions);
+    switchTab("chat");
+    labReset();
+    $("chat-input").focus();
+  }
+
+  // ---------- Tabs ----------
+  function switchTab(name) {
+    for (const t of ["chat", "lab"]) {
+      show("tab-" + t, t === name);
+      $("tab-" + t + "-btn").classList.toggle("active", t === name);
+      $("tab-" + t + "-btn").setAttribute("aria-selected", String(t === name));
+    }
+    $("wrap").classList.toggle("wide", name === "lab");
+  }
+  document.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () => switchTab(b.dataset.tab)));
+
+  // ---------- Screen 2: chat ----------
+  function addMessage(role, text, suggestions = []) {
+    const el = document.createElement("div");
+    el.className = "msg " + role;
+    el.textContent = text;
+    $("messages").appendChild(el);
+    document.querySelectorAll(".chips").forEach((c) => c.remove()); // only show latest suggestions
+    if (suggestions.length) {
+      const chips = document.createElement("div");
+      chips.className = "chips";
+      for (const q of suggestions) {
+        const b = document.createElement("button");
+        b.className = "chip"; b.type = "button"; b.textContent = q;
+        b.onclick = () => ask(q);
+        chips.appendChild(b);
+      }
+      $("messages").appendChild(chips);
+    }
+    window.scrollTo(0, document.body.scrollHeight);
+    return el;
+  }
+
+  async function ask(question) {
+    if (busy || !question.trim()) return;
+    busy = true;
+    $("chat-btn").disabled = true;
+    $("chat-input").value = "";
+    addMessage("user", question);
+    const thinking = addMessage("assistant thinking", "Thinking…");
+    try {
+      const data = await post("/chat", { site_id: siteId, history, question });
+      thinking.remove();
+      // Only record the turn once it succeeded, so history stays consistent.
+      history.push({ role: "user", content: question }, { role: "assistant", content: data.answer });
+      addMessage("assistant", data.answer, data.suggestions);
+    } catch (err) {
+      thinking.remove();
+      const errEl = addMessage("assistant", "");
+      errEl.classList.add("error");
+      errEl.textContent = err.message + " ";
+      const retry = document.createElement("button");
+      retry.textContent = "Retry"; retry.type = "button";
+      retry.onclick = () => { errEl.remove(); [...document.querySelectorAll(".msg.user")].pop()?.remove(); ask(question); };
+      errEl.appendChild(retry);
+    } finally {
+      busy = false;
+      $("chat-btn").disabled = false;
+      $("chat-input").focus();
+    }
+  }
+
+  $("chat-form").addEventListener("submit", (e) => { e.preventDefault(); ask($("chat-input").value); });
+  $("chat-input").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask($("chat-input").value); }
+  });
+
+  $("reset-btn").addEventListener("click", () => {
+    siteId = null; history = [];
+    labReset();
+    switchTab("chat");
+    $("screen-chat").classList.add("hidden");
+    $("screen-url").classList.remove("hidden");
+    $("url-input").value = "";
+    $("url-input").focus();
+  });
+
+  // =====================================================================
+  // Component Lab
+  // =====================================================================
+  const lab = {
+    file: null, fileUrl: null, jobId: null, preview: null,
+    result: null,       // last build result (code, params, assets, original frames, ...)
+    versions: [],       // [{code, params, values}] for undo; last one is current
+    values: {},         // current param values (name -> CSS value string)
+    playing: true, speed: 1, width: "fit",
+  };
+  const LAB_STEPS = ["lab-upload", "lab-confirm", "lab-pick", "lab-progress", "lab-play"];
+  const labShow = (id) => LAB_STEPS.forEach((s) => show(s, s === id));
+
+  function labReset() {
+    if (lab.fileUrl) URL.revokeObjectURL(lab.fileUrl);
+    Object.assign(lab, { file: null, fileUrl: null, jobId: null, preview: null, result: null, versions: [], values: {} });
+    $("drop-img").classList.add("hidden");
+    $("drop-text").textContent = "Drop a screenshot here, paste it (⌘V / Ctrl+V), or click to choose";
+    $("find-btn").disabled = true;
+    ["upload-error", "confirm-error", "pick-error", "progress-error", "frame-error"].forEach((id) => setError(id, ""));
+    $("frame").srcdoc = "";
+    labShow("lab-upload");
+  }
+  document.querySelectorAll(".lab-restart").forEach((b) => b.addEventListener("click", labReset));
+
+  // ---------- step 1: screenshot ----------
+  function setFile(file) {
+    if (!file || !file.type.startsWith("image/")) { setError("upload-error", "That isn't an image. Use a PNG or JPEG screenshot."); return; }
+    setError("upload-error", "");
+    if (lab.fileUrl) URL.revokeObjectURL(lab.fileUrl);
+    lab.file = file;
+    lab.fileUrl = URL.createObjectURL(file);
+    $("drop-img").src = lab.fileUrl;
+    show("drop-img");
+    $("drop-text").textContent = "Click to choose a different screenshot";
+    $("find-btn").disabled = false;
+  }
+  const drop = $("drop");
+  drop.addEventListener("click", () => $("file-input").click());
+  drop.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("file-input").click(); } });
+  $("file-input").addEventListener("change", (e) => setFile(e.target.files[0]));
+  drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
+  drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+  drop.addEventListener("drop", (e) => { e.preventDefault(); drop.classList.remove("over"); setFile(e.dataTransfer.files[0]); });
+  document.addEventListener("paste", (e) => {
+    if ($("tab-lab").classList.contains("hidden") || $("lab-upload").classList.contains("hidden")) return;
+    const item = [...(e.clipboardData?.items || [])].find((i) => i.type.startsWith("image/"));
+    if (item) { e.preventDefault(); setFile(item.getAsFile()); }
+  });
+
+  $("find-btn").addEventListener("click", async () => {
+    if (!lab.file) return;
+    $("find-btn").disabled = true;
+    setError("upload-error", "");
+    show("upload-status");
+    $("upload-status").textContent = "Opening the homepage in a browser and looking for your component… (about 20–40s)";
+    try {
+      const form = new FormData();
+      form.append("site_id", siteId);
+      form.append("screenshot", lab.file);
+      const res = await fetch("/component/locate", { method: "POST", body: form });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || `Request failed (${res.status})`);
+      lab.jobId = data.job_id;
+      lab.preview = data.preview;
+      if (data.match.found) showConfirm(data.match);
+      else { openPicker(); setError("pick-error", "We couldn't find it automatically" + (data.match.reason ? ` (${data.match.reason})` : "") + ". Draw a box around it instead."); }
+    } catch (err) {
+      setError("upload-error", err.message);
+    } finally {
+      $("find-btn").disabled = false;
+      show("upload-status", false);
+    }
+  });
+
+  // ---------- step 2: confirm ----------
+  function showConfirm(match) {
+    const head = $("match-head");
+    head.innerHTML = "";
+    const title = document.createElement("strong");
+    title.textContent = match.description;
+    const pill = document.createElement("span");
+    pill.className = "pill " + match.confidence;
+    pill.textContent = match.confidence === "manual" ? "your selection" : match.confidence + " confidence";
+    const reason = document.createElement("div");
+    reason.className = "muted";
+    reason.textContent = match.reason || match.element;
+    head.append(pill, title, reason);
+    $("confirm-user").src = lab.fileUrl;
+    $("confirm-crop").src = match.crop;
+    setError("confirm-error", "");
+    labShow("lab-confirm");
+  }
+  $("build-btn").addEventListener("click", runBuild);
+  $("pick-btn").addEventListener("click", () => { setError("pick-error", ""); openPicker(); });
+
+  // ---------- manual pick ----------
+  let pickBox = null;
+  function openPicker() {
+    const area = $("pick-area");
+    area.querySelectorAll("img").forEach((i) => i.remove());
+    for (const src of lab.preview.slices) {
+      const img = document.createElement("img");
+      img.src = src; img.alt = "";
+      area.insertBefore(img, $("pick-box"));
+    }
+    pickBox = null;
+    show("pick-box", false);
+    $("pick-use").disabled = true;
+    labShow("lab-pick");
+  }
+  (() => {
+    const area = $("pick-area"), box = $("pick-box");
+    let start = null;
+    const pos = (e) => {
+      const r = area.getBoundingClientRect();
+      return { x: Math.max(0, Math.min(r.width, e.clientX - r.left)), y: Math.max(0, e.clientY - r.top + area.scrollTop) };
+    };
+    area.addEventListener("pointerdown", (e) => { start = pos(e); area.setPointerCapture(e.pointerId); e.preventDefault(); });
+    area.addEventListener("pointermove", (e) => {
+      if (!start) return;
+      const p = pos(e);
+      const b = { x: Math.min(start.x, p.x), y: Math.min(start.y, p.y), w: Math.abs(p.x - start.x), h: Math.abs(p.y - start.y) };
+      Object.assign(box.style, { left: b.x + "px", top: b.y + "px", width: b.w + "px", height: b.h + "px" });
+      show(box, true);
+      pickBox = b;
+    });
+    area.addEventListener("pointerup", () => { start = null; $("pick-use").disabled = !(pickBox && pickBox.w > 8 && pickBox.h > 8); });
+  })();
+  $("pick-cancel").addEventListener("click", () => ($("confirm-crop").src ? labShow("lab-confirm") : labShow("lab-upload")));
+  $("pick-use").addEventListener("click", async () => {
+    const scale = lab.preview.page_width / $("pick-area").clientWidth; // display px -> page px
+    const box = { x: pickBox.x * scale, y: pickBox.y * scale, w: pickBox.w * scale, h: pickBox.h * scale };
+    $("pick-use").disabled = true;
+    try {
+      const data = await post("/component/select", { job_id: lab.jobId, box });
+      showConfirm(data.match);
+    } catch (err) {
+      setError("pick-error", err.message);
+      $("pick-use").disabled = false;
+    }
+  });
+
+  // ---------- step 3: build (streamed progress) ----------
+  async function runBuild() {
+    const steps = $("steps");
+    steps.innerHTML = "";
+    setError("progress-error", "");
+    show("progress-actions", false);
+    labShow("lab-progress");
+    const addStep = (label) => {
+      steps.querySelectorAll("li.active").forEach((li) => { li.classList.remove("active"); li.classList.add("done"); });
+      const li = document.createElement("li");
+      li.className = "active";
+      li.innerHTML = '<span class="dot"></span><span></span>';
+      li.lastChild.textContent = label;
+      steps.appendChild(li);
+    };
+    const fail = (msg) => {
+      steps.querySelectorAll("li.active").forEach((li) => li.classList.remove("active"));
+      setError("progress-error", msg);
+      show("progress-actions");
+    };
+    try {
+      const res = await fetch("/component/build", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ job_id: lab.jobId }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        return fail(data.detail || `Request failed (${res.status})`);
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "", result = null;
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        let nl;
+        while ((nl = buf.indexOf("\n")) !== -1) {
+          const line = buf.slice(0, nl).trim();
+          buf = buf.slice(nl + 1);
+          if (!line) continue;
+          const ev = JSON.parse(line);
+          if (ev.step) addStep(ev.label);
+          else if (ev.error) return fail(ev.error);
+          else if (ev.result) result = ev.result;
+        }
+      }
+      if (!result) return fail("The build stopped before finishing. Try again.");
+      steps.querySelectorAll("li.active").forEach((li) => { li.classList.remove("active"); li.classList.add("done"); });
+      openPlayground(result);
+    } catch (err) {
+      fail(err.message || "Connection lost while building.");
+    }
+  }
+  $("retry-build").addEventListener("click", runBuild);
+
+  // ---------- step 4: playground ----------
+
+  // Runs inside the sandboxed iframe (serialized with toString). Applies params, reports size/errors,
+  // and drives pause / speed / scrub for CSS + Web Animations, GSAP's global timeline and Lottie.
+  function clRuntime(init) {
+    const root = document.documentElement;
+    for (const [k, v] of Object.entries(init.params || {})) root.style.setProperty(k, v);
+    let rate = init.speed || 1, paused = false;
+    const post = (m) => parent.postMessage(Object.assign({ __cl: true }, m), "*");
+    addEventListener("error", (e) => post({ type: "error", message: String(e.message || "Script error") }));
+    addEventListener("unhandledrejection", (e) => post({ type: "error", message: String((e.reason && e.reason.message) || e.reason) }));
+    const waapi = () => (document.getAnimations ? document.getAnimations() : []);
+    const gtl = () => window.gsap && window.gsap.globalTimeline;
+    const lotties = () => (window.lottie && window.lottie.getRegisteredAnimations ? window.lottie.getRegisteredAnimations() : []);
+    const sync = () => {
+      for (const a of waapi()) {
+        if (a.playbackRate !== rate) a.playbackRate = rate;
+        if (paused && a.playState === "running") a.pause();
+      }
+      const t = gtl();
+      if (t) { t.timeScale(rate); if (t.paused() !== paused) t.paused(paused); }
+      for (const l of lotties()) if (paused && !l.isPaused) l.pause();
+    };
+    setInterval(sync, 200);
+    const report = () => {
+      const el = document.getElementById("component-root") || document.body;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      post({ type: "status", height: Math.ceil(r.bottom + scrollY + 8) });
+    };
+    addEventListener("load", () => { sync(); report(); setTimeout(report, 600); setTimeout(report, 2000); });
+    addEventListener("message", (e) => {
+      const m = e.data || {};
+      if (m.type === "param") {
+        root.style.setProperty(m.name, m.value);
+        dispatchEvent(new CustomEvent("cl:param", { detail: { name: m.name, value: m.value } }));
+        setTimeout(report, 300);
+      } else if (m.type === "pause") {
+        paused = true; sync();
+      } else if (m.type === "play") {
+        paused = false;
+        for (const a of waapi()) if (a.playState === "paused") a.play();
+        const t = gtl(); if (t) t.paused(false);
+        for (const l of lotties()) l.play();
+      } else if (m.type === "speed") {
+        rate = m.value; sync();
+      } else if (m.type === "seek") {
+        paused = true;
+        for (const a of waapi()) {
+          const t = a.effect && a.effect.getComputedTiming();
+          if (!t) continue;
+          const span = isFinite(t.endTime) ? t.endTime : (t.delay || 0) + (Number(t.duration) || 0);
+          a.pause(); a.currentTime = m.value * span;
+        }
+        const g = gtl();
+        if (g) {
+          g.pause();
+          for (const c of g.getChildren(false, true, true)) {
+            const d = c.duration();
+            if (d && isFinite(d)) c.progress(m.value);
+          }
+        }
+        for (const l of lotties()) l.goToAndStop(Math.round(m.value * Math.max(0, l.totalFrames - 1)), true);
+      }
+    });
+  }
+
+  const SANDBOX_CSP = [
+    "default-src 'none'",
+    "script-src 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com",
+    "style-src 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com",
+    "font-src https://fonts.gstatic.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com data:",
+    "img-src https: data: blob:",
+    "media-src https: data: blob:",
+    "connect-src 'none'",
+    "worker-src blob:",
+  ].join("; ");
+
+  const safeJson = (v) => JSON.stringify(v).replace(/</g, "\\u003c");
+
+  // Insert markup right after <head> (or at the start when the document has none).
+  function intoHead(html, markup) {
+    const m = /<head[^>]*>/i.exec(html);
+    return m ? html.slice(0, m.index + m[0].length) + markup + html.slice(m.index + m[0].length) : markup + html;
+  }
+
+  function sandboxDoc() {
+    const v = current();
+    const head =
+      `<meta http-equiv="Content-Security-Policy" content="${SANDBOX_CSP}">` +
+      `<script>(${clRuntime.toString()})(${safeJson({ params: lab.values, speed: lab.speed })});<\/script>` +
+      (hasAssets() ? `<script>window.__clAssets=${safeJson(lab.result.assets)};<\/script>` : "");
+    return intoHead(v.code, head);
+  }
+
+  const hasAssets = () => lab.result && lab.result.assets && Object.keys(lab.result.assets).length > 0;
+
+  // Standalone file: the component + any pre-loaded files + the current parameter values.
+  function exportDoc() {
+    let html = current().code;
+    if (hasAssets()) html = intoHead(html, `<script>window.__clAssets=${safeJson(lab.result.assets)};<\/script>`);
+    const style = Object.entries(lab.values).map(([k, v]) => `${k}: ${v}`).join("; ");
+    if (style) {
+      if (/<html\b(?![^>]*\bstyle=)/i.test(html)) html = html.replace(/<html\b/i, `<html style="${style.replace(/"/g, "&quot;")}"`);
+      else html = intoHead(html, `<style>:root { ${style} !important }</style>`);
+    }
+    return html;
+  }
+
+  const current = () => lab.versions[lab.versions.length - 1];
+  const fmt = (p, v) => (p.type === "range" ? `${v}${p.unit || ""}` : String(v));
+
+  function openPlayground(result) {
+    lab.result = result;
+    lab.versions = [{ code: result.code, params: result.params }];
+    lab.values = {};
+    lab.playing = true; lab.speed = 1;
+    $("speed").value = "1";
+    $("edit-log").innerHTML = "";
+    $("undo-btn").disabled = true;
+
+    $("play-title").textContent = $("match-head").querySelector("strong")?.textContent || result.element;
+    const meta = $("play-meta");
+    meta.innerHTML = "";
+    const score = document.createElement("span");
+    score.className = "pill " + (result.score >= 8 ? "good" : result.score >= 6 ? "fair" : "poor");
+    score.textContent = `Match ${result.score}/10`;
+    score.title = "How closely the rebuild matched the original when we compared screenshots";
+    meta.appendChild(score);
+    for (const lib of result.libraries || []) {
+      const p = document.createElement("span"); p.className = "pill"; p.textContent = "site uses " + lib; meta.appendChild(p);
+    }
+    $("play-notes").textContent = result.notes || "";
+    $("play-diffs").textContent = result.differences?.length ? "Remaining differences from the original:\n• " + result.differences.join("\n• ") : "";
+
+    const frames = $("orig-frames");
+    frames.innerHTML = "";
+    ["0s", "0.5s", "1.2s", "2.5s", "hover"].forEach((label, i) => {
+      if (!result.original[i]) return;
+      const f = document.createElement("figure");
+      f.innerHTML = '<img alt=""><figcaption></figcaption>';
+      f.querySelector("img").src = result.original[i];
+      f.querySelector("img").alt = "Original at " + label;
+      f.querySelector("figcaption").textContent = label;
+      frames.appendChild(f);
+    });
+
+    labShow("lab-play");
+    renderParams();
+    setWidth("fit");
+    reload();
+  }
+
+  function reload() {
+    setError("frame-error", "");
+    lab.playing = true;
+    $("pp-btn").textContent = "Pause";
+    $("scrub").value = 0;
+    $("frame").srcdoc = sandboxDoc();
+  }
+
+  const send = (msg) => $("frame").contentWindow?.postMessage(msg, "*");
+
+  window.addEventListener("message", (e) => {
+    if (e.source !== $("frame").contentWindow || !e.data || !e.data.__cl) return;
+    if (e.data.type === "status" && e.data.height) {
+      $("frame").style.height = Math.max(160, Math.min(1100, e.data.height)) + "px";
+    } else if (e.data.type === "error") {
+      setError("frame-error", "The component reported an error: " + e.data.message + ". You can ask Claude to fix it below.");
+    }
+  });
+
+  function renderParams() {
+    const box = $("params");
+    box.innerHTML = "";
+    const params = current().params;
+    if (!params.length) { box.innerHTML = '<p class="muted">No adjustable values. Ask for some below.</p>'; return; }
+    for (const p of params) {
+      const wrap = document.createElement("div");
+      wrap.className = "param";
+      const id = "p" + p.name.replace(/[^\w-]/g, "");
+      const label = document.createElement("label");
+      label.htmlFor = id;
+      label.textContent = p.label;
+      const val = document.createElement("span");
+      label.appendChild(val);
+      let input;
+      const currentVal = lab.values[p.name];
+      if (p.type === "range") {
+        input = document.createElement("input");
+        Object.assign(input, { type: "range", min: p.min, max: p.max, step: p.step });
+        input.value = currentVal !== undefined ? parseFloat(currentVal) : p.default;
+        val.textContent = fmt(p, input.value);
+      } else if (p.type === "color") {
+        input = document.createElement("input");
+        input.type = "color";
+        input.value = currentVal || p.default;
+        val.textContent = input.value;
+      } else {
+        input = document.createElement("select");
+        for (const o of p.options) { const opt = document.createElement("option"); opt.value = opt.textContent = o; input.appendChild(opt); }
+        input.value = currentVal || p.default;
+      }
+      input.id = id;
+      input.addEventListener("input", () => {
+        const v = fmt(p, input.value);
+        lab.values[p.name] = v;
+        if (p.type !== "select") val.textContent = p.type === "color" ? input.value : v;
+        send({ type: "param", name: p.name, value: v });
+      });
+      wrap.append(label, input);
+      box.appendChild(wrap);
+    }
+  }
+  $("reset-params").addEventListener("click", () => { lab.values = {}; renderParams(); reload(); });
+
+  // playback
+  $("pp-btn").addEventListener("click", () => {
+    lab.playing = !lab.playing;
+    send({ type: lab.playing ? "play" : "pause" });
+    $("pp-btn").textContent = lab.playing ? "Pause" : "Play";
+  });
+  $("replay-btn").addEventListener("click", reload);
+  $("speed").addEventListener("change", () => { lab.speed = parseFloat($("speed").value); send({ type: "speed", value: lab.speed }); });
+  $("scrub").addEventListener("input", () => {
+    lab.playing = false;
+    $("pp-btn").textContent = "Play";
+    send({ type: "seek", value: $("scrub").value / 1000 });
+  });
+
+  function setWidth(w) {
+    lab.width = w;
+    document.querySelectorAll("#widths button").forEach((b) => b.classList.toggle("on", b.dataset.w === w));
+    const frame = $("frame");
+    if (w === "fit") {
+      frame.style.width = "100%";
+      frame.style.maxWidth = (lab.result?.width ? Math.round(lab.result.width) : 1280) + "px";
+    } else {
+      frame.style.width = w + "px";
+      frame.style.maxWidth = "none";
+    }
+  }
+  document.querySelectorAll("#widths button").forEach((b) => b.addEventListener("click", () => setWidth(b.dataset.w)));
+
+  // edits
+  function logEdit(cls, text) {
+    const el = document.createElement("div");
+    el.className = cls;
+    el.textContent = text;
+    $("edit-log").appendChild(el);
+    $("edit-log").scrollTop = $("edit-log").scrollHeight;
+    return el;
+  }
+  $("edit-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const instruction = $("edit-input").value.trim();
+    if (!instruction || $("edit-btn").disabled) return;
+    $("edit-btn").disabled = true;
+    $("edit-input").value = "";
+    logEdit("me", instruction);
+    const pending = logEdit("ai", "Working on it…");
+    try {
+      const v = current();
+      const data = await post("/component/edit", { code: v.code, params: v.params, instruction, context: lab.result.context || "" });
+      lab.versions.push({ code: data.code, params: data.params });
+      // Keep the user's tweaks for parameters that still exist.
+      const names = new Set(data.params.map((p) => p.name));
+      for (const k of Object.keys(lab.values)) if (!names.has(k)) delete lab.values[k];
+      pending.textContent = data.reply || "Done.";
+      $("undo-btn").disabled = false;
+      renderParams();
+      reload();
+    } catch (err) {
+      pending.className = "err";
+      pending.textContent = err.message;
+    } finally {
+      $("edit-btn").disabled = false;
+    }
+  });
+  $("edit-input").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("edit-form").requestSubmit(); }
+  });
+  $("undo-btn").addEventListener("click", () => {
+    if (lab.versions.length < 2) return;
+    lab.versions.pop();
+    $("undo-btn").disabled = lab.versions.length < 2;
+    logEdit("ai", "Undid the last change.");
+    renderParams();
+    reload();
+  });
+
+  // export
+  $("copy-btn").addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(exportDoc());
+      $("copy-btn").textContent = "Copied";
+    } catch {
+      $("copy-btn").textContent = "Copy failed";
+    }
+    setTimeout(() => ($("copy-btn").textContent = "Copy HTML"), 1500);
+  });
+  $("download-btn").addEventListener("click", () => {
+    const blob = new Blob([exportDoc()], { type: "text/html" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = (($("play-title").textContent || "component").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "component") + ".html";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+</script>
+</body>
+</html>

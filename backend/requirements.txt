@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+httpx
+anthropic
+python-dotenv
+playwright
+pillow
+python-multipart
